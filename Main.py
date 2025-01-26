@@ -337,6 +337,14 @@ if current_page == "Dashboard":
     if df is not None:
         # Quick Statistics in cards
         st.subheader("📊 Overview")
+        
+        # Funnel Chart in a nice container
+        st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
+        funnel_fig = create_funnel_chart(df)
+        if funnel_fig:
+            st.plotly_chart(funnel_fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -362,13 +370,6 @@ if current_page == "Dashboard":
                     <h2>{}</h2>
                 </div>
             """.format(df['Contact 1 phone'].notna().sum()), unsafe_allow_html=True)
-
-        # Funnel Chart in a nice container
-        st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
-        funnel_fig = create_funnel_chart(df)
-        if funnel_fig:
-            st.plotly_chart(funnel_fig, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
         
         
 elif current_page == "New Call":
