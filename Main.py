@@ -1,5 +1,3 @@
-pip install -r dotenv
-
 import streamlit as st
 import requests
 import json
