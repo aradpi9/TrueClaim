@@ -3,13 +3,10 @@ import requests
 import json
 import os
 import pandas as pd
-from dotenv import load_dotenv
 from notion_client import Client
 import plotly.graph_objects as go
 from datetime import datetime
 
-# Load environment variables
-load_dotenv()
 
 # Set page configuration
 st.set_page_config(
@@ -133,7 +130,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize Notion client
-NOTION_TOKEN = os.getenv("NOTION_TOKEN")
+NOTION_TOKEN = "ntn_S6159294934albrajfceBHL4szrrrMllKAcFNUGM62v7JI"
 DATABASE_ID = "18316f1f61d680a2921bd08b8c62f895"
 
 def fetch_notion_data():
@@ -400,10 +397,11 @@ elif current_page == "New Call":
             if not phone_number or not task:
                 st.error("Please fill in both phone number and task fields")
             else:
-                api_key = os.getenv("BLEND_API_KEY")  # Get API key from environment variable
+                BLEND_API_KEY = "org_ba2e4ccfb75e56afc088d9804df57d2623542e8bbd3de2c02bfcb0024daa778c1850bba9de94a2d1ec6a69"
+  # Get API key from environment variable
                 # Headers
                 headers = {
-                    'Authorization': api_key,
+                    'Authorization': BLEND_API_KEY,
                     'x-bland-org-id': 'da9f344c-390c-4d2b-98a6-be62a74b29f4'
                 }
 
@@ -486,7 +484,7 @@ else:  # Batch Calls tab
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
             if st.button("📞 Start Batch Calls"):
-                api_key = os.getenv("BLEND_API_KEY")  # Get API key from environment variable
+                BLEND_API_KEY = "org_ba2e4ccfb75e56afc088d9804df57d2623542e8bbd3de2c02bfcb0024daa778c1850bba9de94a2d1ec6a69"  # Get API key from environment variable
                 df = df.dropna(subset=['Contact 1 phone', 'Task'])
                 st.info("Starting batch calls...")
                 progress_bar = st.progress(0)
@@ -537,7 +535,7 @@ else:  # Batch Calls tab
                     
                     try:
                         headers = {
-                            'Authorization': api_key,
+                            'Authorization': BLEND_API_KEY,
                             'x-bland-org-id': 'da9f344c-390c-4d2b-98a6-be62a74b29f4'
                         }
                         response = requests.post(
