@@ -396,7 +396,7 @@ elif current_page == "New Call":
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         if st.button("📞 Make Call"):
-            if not Customer_phone_number or not task:
+            if not Customer_phone_number or not Agent_task:
                 st.error("Please fill in both phone number and task fields")
             else:
                 BLEND_API_KEY = "org_ba2e4ccfb75e56afc088d9804df57d2623542e8bbd3de2c02bfcb0024daa778c1850bba9de94a2d1ec6a69"
