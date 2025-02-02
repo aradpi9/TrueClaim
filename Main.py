@@ -380,79 +380,78 @@ elif current_page == "New Call":
     
     with col1:
         st.markdown("<div class='input-container'>", unsafe_allow_html=True)
-        phone_number = st.text_input("📱 Phone Number", placeholder="+1234567890")
+        Customer_phone_number = st.text_input("📱 Phone Number", placeholder="+1234567890")
         customer_name = st.text_input("👤 Customer Name")
         st.markdown("</div>", unsafe_allow_html=True)
         
     with col2:
         st.markdown("<div class='input-container'>", unsafe_allow_html=True)
-        aigent_Name = st.text_input("📱 Aigent Name", placeholder="John Doe")
-        address = st.text_input("🏠 Address")
+        Agent_name = st.text_input("📱 Agent Name", placeholder="John Doe")
+        Home_address = st.text_input("🏠 Address")
         st.markdown("</div>", unsafe_allow_html=True)
     
-    task = st.text_area("🎯 Task/Script", height=100)
+    Agent_task = st.selectbox("🎯 Task", ["Cold caller", "Closer representative"])
+    Agent_task = "6a5a0412-6481-4533-b560-cf72283e956b" if "Cold caller" in Agent_task else "29e7ef67-4d36-4d15-aa09-0a38642fea26" if "Closer representative" in Agent_task else None
     
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         if st.button("📞 Make Call"):
-            if not phone_number or not task:
+            if not Customer_phone_number or not task:
                 st.error("Please fill in both phone number and task fields")
             else:
                 BLEND_API_KEY = "org_ba2e4ccfb75e56afc088d9804df57d2623542e8bbd3de2c02bfcb0024daa778c1850bba9de94a2d1ec6a69"
-  # Get API key from environment variable
+                # Get API key from environment variable
                 # Headers
                 headers = {
-                    'Authorization': BLEND_API_KEY,
-                    'x-bland-org-id': 'da9f344c-390c-4d2b-98a6-be62a74b29f4'
+                   'Authorization': BLEND_API_KEY,
+                   'Content-Type': 'application/json'
                 }
 
                 # Data
                 data = {
-                    "phone_number": phone_number,
-                    "from": None,
-                    "task": task,
-                    "model": "turbo",
+                    "phone_number": Customer_phone_number,
+                    "task": "",
+                    "model": "enhanced",
                     "language": "en",
                     "voice": "Public - June 2978",
                     "voice_settings": {},
-                    "pathway_id": "6a5a0412-6481-4533-b560-cf72283e956b",
+                    "pathway_id": Agent_task,
                     "local_dialing": False,
-                    "max_duration": 12,
+                    "max_duration": "12",
                     "answered_by_enabled": False,
-                    "wait_for_greeting": False,
-                    "noise_cancellation": False,
+                    "wait_for_greeting": True,
+                    "noise_cancellation": True,
+                    "ignore_button_press": True,
                     "record": False,
                     "amd": False,
                     "interruption_threshold": 100,
-                    "voicemail_message": None,
-                    "temperature": None,
-                    "transfer_phone_number": None,
+                    "voicemail_message": "test",
+                    "temperature": 1,
                     "transfer_list": {},
-                    "metadata": None,
                     "pronunciation_guide": [],
-                    "start_time": None,
-                    "background_track": "none",
                     "request_data": {
-                        "customer name": customer_name,
-                        "home address": address,
-                        "aigent name": aigent_Name,
+                    "customer name": customer_name,
+                    "home address": Home_address,
+                    "agent name": Agent_name
                     },
-                    "tools": [],
+                    "retry": {
+                    "wait": 720,
+                    "voicemail_action": "hangup",
+                    "voicemail_message": ""
+                    },
                     "dynamic_data": [],
-                    "analysis_preset": None,
                     "analysis_schema": {},
-                    "webhook": None,
                     "calendly": {},
-                    "timezone": "America/Los_Angeles"
+                    "timezone": "America/New_York"
+
                 }
 
                 try:
                     # Make the API call
-                    response = requests.post(
-                        "https://api.bland.ai/v1/calls",
-                        headers=headers,
-                        json=data
-                    )
+                    response = requests.request("POST"
+                                                , "https://api.bland.ai/v1/calls"
+                                                , json=data
+                                                , headers=headers)
                     
                     # Display the response
                     st.json(response.json())
