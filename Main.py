@@ -271,7 +271,8 @@ st.sidebar.markdown("""
 nav_items = {
     "🏠 Dashboard": "Dashboard",
     "📞 New Call": "New Call",
-    "📊 Batch Calls": "Batch Calls"
+    "📊 Batch Calls": "Batch Calls",
+    "📥 Update Database": "Update Database"
 }
 
 selected_tab = st.sidebar.radio(
@@ -391,15 +392,26 @@ elif current_page == "New Call":
         st.markdown("</div>", unsafe_allow_html=True)
     
     Agent_task = st.selectbox("🎯 Task", ["Cold caller", "Closer representative"])
+    
+    # Show additional fields for Closer representative
+    specialist_name = None
+    first_call_summary = None
+    if Agent_task == "Closer representative":
+        specialist_name = st.text_input("👨‍⚕️ Specialist Name")
+        first_call_summary = st.text_area("📝 First Call Summary", height=100)
+    
     Agent_task = "6a5a0412-6481-4533-b560-cf72283e956b" if "Cold caller" in Agent_task else "29e7ef67-4d36-4d15-aa09-0a38642fea26" if "Closer representative" in Agent_task else None
+    Aigen_voice = "Public - June 2978" if "Cold caller" in Agent_task else "mason (da9f34)" if "Closer representative" in Agent_task else None
     
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         if st.button("📞 Make Call"):
             if not Customer_phone_number or not Agent_task:
                 st.error("Please fill in both phone number and task fields")
+            elif Agent_task == "29e7ef67-4d36-4d15-aa09-0a38642fea26" and (not specialist_name or not first_call_summary):
+                st.error("Please fill in specialist name and first call summary")
             else:
-                BLEND_API_KEY = "org_ba2e4ccfb75e56afc088d9804df57d2623542e8bbd3de2c02bfcb0024daa778c1850bba9de94a2d1ec6a69"
+                BLEND_API_KEY = "org_ba2e4ccfb75e56afc088d9804df57d2623542e8bbd3de2c02bfcb0024daa778c1850bba9de94a2d1ec6a69"  # Get API key from environment variable
                 # Get API key from environment variable
                 # Headers
                 headers = {
@@ -413,7 +425,7 @@ elif current_page == "New Call":
                     "task": "",
                     "model": "enhanced",
                     "language": "en",
-                    "voice": "Public - June 2978",
+                    "voice": Aigen_voice,
                     "voice_settings": {},
                     "pathway_id": Agent_task,
                     "local_dialing": False,
@@ -445,7 +457,14 @@ elif current_page == "New Call":
                     "timezone": "America/New_York"
 
                 }
-
+                
+                # Add specialist info to request_data if it's a closer call
+                if Agent_task == "29e7ef67-4d36-4d15-aa09-0a38642fea26":
+                    data["request_data"].update({
+                        "specialist_name": specialist_name,
+                        "first_call_summary": first_call_summary
+                    })
+                
                 try:
                     # Make the API call
                     response = requests.request("POST"
@@ -458,6 +477,255 @@ elif current_page == "New Call":
                     
                 except Exception as e:
                     st.error(f"Error making API call: {str(e)}")
+
+elif current_page == "Update Database":
+    st.title("Update Database")
+    
+    # Initialize session state for storing page IDs if not exists
+    if 'last_uploaded_pages' not in st.session_state:
+        st.session_state.last_uploaded_pages = []
+    
+    def update_notion_database(df):
+        notion = Client(auth=NOTION_TOKEN)
+        success_count = 0
+        error_count = 0
+        
+        # Function to create rich text content
+        def create_rich_text(content):
+            if pd.isna(content) or content == '' or content is None:
+                return {"rich_text": []}
+            # Filter out "nan" strings
+            content_str = str(content).strip()
+            if content_str.lower() == 'nan':
+                return {"rich_text": []}
+            return {"rich_text": [{"text": {"content": content_str}}]}
+        
+        # Function to create title content
+        def create_title(content):
+            if pd.isna(content) or content == '' or content is None:
+                return {"title": []}
+            # Filter out "nan" strings
+            content_str = str(content).strip()
+            if content_str.lower() == 'nan':
+                return {"title": []}
+            return {"title": [{"text": {"content": content_str}}]}
+        
+        # Function to create date content
+        def create_date(date_str):
+            if pd.isna(date_str) or date_str == '' or date_str is None:
+                return {"date": None}
+            try:
+                # Try to parse the date string into a datetime object
+                date_obj = pd.to_datetime(date_str)
+                # Format the date as ISO 8601 string
+                return {"date": {"start": date_obj.strftime("%Y-%m-%d")}}
+            except (ValueError, TypeError):
+                return {"date": None}
+        
+        # Function to create number content
+        def create_number(value):
+            if pd.isna(value) or value == '' or value is None:
+                return {"number": None}
+            try:
+                # Remove any non-numeric characters and convert to float
+                cleaned_value = ''.join(filter(str.isdigit, str(value)))
+                return {"number": float(cleaned_value)} if cleaned_value else {"number": None}
+            except (ValueError, TypeError):
+                return {"number": None}
+        
+        # Function to create phone number content
+        def create_phone(number):
+            if pd.isna(number) or number == '' or number is None:
+                return {"phone_number": None}
+            # Filter out "nan" strings
+            number_str = str(number).strip()
+            if number_str.lower() == 'nan':
+                return {"phone_number": None}
+            return {"phone_number": number_str}
+        
+        # Function to create email content
+        def create_email(email):
+            if pd.isna(email) or email == '' or email is None:
+                return {"email": None}
+            # Filter out "nan" strings
+            email_str = str(email).strip()
+            if email_str.lower() == 'nan':
+                return {"email": None}
+            return {"email": email_str}
+        
+        # Function to combine multiple values with comma
+        def combine_values(row, columns):
+            values = []
+            for col in columns:
+                if col in row and not pd.isna(row[col]) and row[col] != '' and row[col] is not None:
+                    value = str(row[col]).strip()
+                    if value.lower() != 'nan':  # Skip "nan" values
+                        values.append(value)
+            return ', '.join(values) if values else None
+        
+        progress_bar = st.progress(0, text="Processing rows...")
+        status_text = st.empty()
+        
+        for index, row in df.iterrows():
+            try:
+                # Prepare phone numbers and emails
+                phones = combine_values(row, ['Phone 1', 'Phone 2', 'Phone 3', 'Phone 4', 'Phone 5'])
+                emails = combine_values(row, ['Email 1', 'Email 2', 'Email 3', 'Email 4', 'Email 5'])
+                
+                # Process relatives data
+                relative_names = combine_values(row, ['RELATIVE 1: Name', 'RELATIVE 2: Name', 'RELATIVE 3: Name'])
+                relative_phones = combine_values(row, ['RELATIVE 1: Phone', 'RELATIVE 2: Phone', 'RELATIVE 3: Phone'])
+                relative_emails = combine_values(row, ['RELATIVE 1: Email', 'RELATIVE 2: Email', 'RELATIVE 3: Email'])
+
+                # Create the page with proper property formatting
+                new_page = {
+                    "parent": {"database_id": DATABASE_ID},
+                    "properties": {
+                        "Surplus Amount": create_number(row.get('Surplus Amount')),
+                        "Closing Bid": create_number(row.get('Closing Bid')),
+                        "Opening Bid": create_number(row.get('Opening Bid')),
+                        "Date sold": create_date(row.get('Date Sold')),
+                        "Case number": create_rich_text(row.get('Case Number')),
+                        "Parcel Number": create_rich_text(row.get('Parcel Number')),
+                        "Type of foreclosure": create_rich_text(row.get('Type of foreclosure')),
+                        "First name": create_title(row.get('First Name')),
+                        "Last name": create_rich_text(row.get('Last Name')),
+                        "Main contact phone": create_phone(phones),
+                        "Main contact Email": create_email(emails),
+                        "Property Street": create_rich_text(row.get('Property Street')),
+                        "Property City": create_rich_text(row.get('Property City')),
+                        "Property State": create_rich_text(row.get('Property State')),
+                        "Property ZIP Code": create_number(row.get('Property ZIP Code')),
+                        "Mailing address": create_rich_text(row.get('Mailing Address')),
+                        "Mailing City": create_rich_text(row.get('Mailing City')),
+                        "Mailing State": create_rich_text(row.get('Mailing State')),
+                        "Mailing Zip Code": create_number(row.get('Mailing Zip Code')),
+                        "County": create_rich_text(row.get('County')),
+                        "Relative name": create_rich_text(relative_names),
+                        "Relative phone": create_phone(relative_phones),
+                        "Relative Email": create_email(relative_emails),
+                        "Active": {"select": {"name": "No"}}
+                    }
+                }
+                
+                # Remove any properties with empty values
+                properties_to_remove = []
+                for prop_name, prop_value in new_page["properties"].items():
+                    if (prop_value.get("rich_text", []) == [] and "rich_text" in prop_value) or \
+                       (prop_value.get("number") is None and "number" in prop_value) or \
+                       (prop_value.get("phone_number") is None and "phone_number" in prop_value) or \
+                       (prop_value.get("email") is None and "email" in prop_value) or \
+                       (prop_value.get("date") is None and "date" in prop_value) or \
+                       (prop_value.get("title", []) == [] and "title" in prop_value):
+                        properties_to_remove.append(prop_name)
+                
+                for prop_name in properties_to_remove:
+                    del new_page["properties"][prop_name]
+                
+                try:
+                    # Create the page in Notion
+                    response = notion.pages.create(**new_page)
+                    success_count += 1
+                    st.session_state.last_uploaded_pages.append(response['id'])  # Store the page ID
+                except Exception as e:
+                    error_count += 1
+                    st.error(f"Error creating page: {str(e)}")
+                finally:
+                    # Update progress
+                    progress = (index + 1) / len(df)
+                    progress_bar.progress(progress, text=f"Processing row {index + 1} of {len(df)}")
+                    status_text.text(f"Status: {success_count} successful, {error_count} errors")
+            
+            except Exception as e:
+                st.error(f"Error processing row {index + 1}: {str(e)}")
+        
+        st.success(f"Successfully added {success_count} records to Notion database. {error_count} records failed.")
+        
+        return success_count, error_count
+        
+    # File upload section with explicit label
+    uploaded_file = st.file_uploader("Upload File", type=['csv', 'xlsx', 'xls'], label_visibility="visible")
+    
+    if uploaded_file is not None:
+        try:
+            # Read the file based on its type and convert data types
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:  # Excel file
+                df = pd.read_excel(uploaded_file)
+            
+            # Convert numeric columns to string to avoid Arrow serialization issues
+            numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+            for col in numeric_columns:
+                df[col] = df[col].astype(str)
+            
+            # Show basic information about the data
+            st.subheader("File Preview")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(label="Total Rows", value=str(len(df)))
+            with col2:
+                st.metric(label="Total Columns", value=str(len(df.columns)))
+            with col3:
+                st.metric(label="File Size", value=f"{uploaded_file.size/1024:.2f} KB")
+            
+            # Display column information with explicit labels
+            st.subheader("Column Information")
+            col_info = pd.DataFrame({
+                'Column Name': df.columns,
+                'Non-Null Count': df.count().values,
+                'Null Count': df.isnull().sum().values
+            })
+            st.dataframe(col_info, hide_index=True, use_container_width=True)
+            
+            # Show data preview with explicit label
+            st.subheader("Data Preview (First 5 Rows)")
+            st.dataframe(df.head(5), hide_index=True, use_container_width=True)
+            
+            # Add a button to confirm upload with explicit label and help text
+            if st.button(
+                label="✅ Confirm and Update Database",
+                help="Click to start updating the Notion database",
+                type="primary"
+            ):
+                with st.spinner("Updating Notion database..."):
+                    success_count, error_count = update_notion_database(df)
+            
+            # Add Set as Active button outside the update function
+            if st.session_state.last_uploaded_pages:
+                if st.button("🔄 Set as Active", type="primary", help="Click to set all newly added records as Active", key="set_active"):
+                    notion = Client(auth=NOTION_TOKEN)
+                    with st.spinner("Setting records as Active..."):
+                        active_success = 0
+                        active_error = 0
+                        
+                        # Create a progress bar for activation
+                        active_progress = st.progress(0)
+                        total_pages = len(st.session_state.last_uploaded_pages)
+                        
+                        for i, page_id in enumerate(st.session_state.last_uploaded_pages):
+                            try:
+                                # Update the page's Active property to "Yes"
+                                notion.pages.update(
+                                    page_id=page_id,
+                                    properties={
+                                        "Active": {"select": {"name": "Yes"}}
+                                    }
+                                )
+                                active_success += 1
+                            except Exception as e:
+                                active_error += 1
+                                st.error(f"Error updating page {page_id}: {str(e)}")
+                            
+                            active_progress.progress((i + 1) / total_pages)
+                        
+                        if active_success > 0:
+                            st.success(f"Successfully set {active_success} records as Active. {active_error} updates failed.")
+                            st.session_state.last_uploaded_pages = []  # Clear the list after activation
+        
+        except Exception as e:
+            st.error(f"Error reading file: {str(e)}")
+            st.info("Please make sure your file is properly formatted and try again.")
 
 else:  # Batch Calls tab
     st.title("Batch Calls from Database")
