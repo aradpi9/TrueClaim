@@ -154,37 +154,23 @@ def fetch_notion_data():
             if not properties:
                 continue
                 
-            # Helper function to safely get text content
-            def get_text_content(prop_value, prop_type='rich_text'):
-                if not prop_value:
-                    return ''
-                try:
-                    if prop_type == 'rich_text':
-                        texts = prop_value.get('rich_text', [])
-                        if not texts:
-                            return ''
-                        first_text = texts[0].get('text', {})
-                        return first_text.get('content', '')
-                    elif prop_type == 'title':
-                        titles = prop_value.get('title', [])
-                        if not titles:
-                            return ''
-                        first_title = titles[0].get('text', {})
-                        return first_title.get('content', '')
-                except (AttributeError, IndexError, KeyError):
-                    return ''
-                return ''
 
             # Extract data with safe fallbacks
             try:
                 row = {
-                    'Contact 1 name': get_text_content(properties.get('Contact 1 name')),
-                    'Contact 1 phone': properties.get('Contact 1 phone', {}).get('phone_number', ''),
-                    'Address': get_text_content(properties.get('Address')),
-                    'Last contact date': properties.get('Last contact date', {}).get('date', {}).get('start', ''),
-                    'Status of Claim': properties.get('Status of Claim', {}).get('status', {}).get('name', ''),  
-                    'Notes': get_text_content(properties.get('Notes')),
-                    'Task': get_text_content(properties.get('Task'))
+                    'notion raw id': page['id'],
+                    'customer name': page['properties']['First name']['title'][0]['plain_text'],
+                    'customer last name': page['properties']['Last name']['rich_text'][0]['plain_text'],
+                    'Phone': page['properties']['Main contact phone']['phone_number'],
+                    'Email': page['properties']['Main contact Email']['email'],
+                    'Email collected': page['properties']['Main contact Email collected']['email'],
+                    'home address': page['properties']['Property Street']['rich_text'][0]['plain_text'],
+                    'Next Follow Up Date': page['properties']['Next Follow Up Date']['date']['start'] if page['properties']['Next Follow Up Date']['date'] else '',
+                    'Claim': page['properties']['Status of Claim']['status']['name'],
+                    'Lead': page['properties']['Status of lead']['status']['name'],   
+                    'call id' : page['properties']['Last call ID']['rich_text'][0]['plain_text'] if page['properties']['Last call ID']['rich_text'] else '',
+                    'cold call summary': page['properties']['cold call summary']['rich_text'][0]['plain_text'] if page['properties']['cold call summary']['rich_text'] else '',
+                    'Active': page['properties']['Active']['select']['name']
                 }
                 # Only add row if it has at least some data
                 if any(row.values()):
@@ -205,7 +191,7 @@ def fetch_notion_data():
 
 def create_funnel_chart(df):
     """Create a funnel chart from lead status data"""
-    if 'Status of Claim' not in df.columns:
+    if 'Claim' not in df.columns:
         return None
         
     # Define the desired order of statuses
@@ -218,7 +204,7 @@ def create_funnel_chart(df):
     ]
     
     # Count the number of leads in each status
-    status_counts = df['Status of Claim'].value_counts()
+    status_counts = df['Claim'].value_counts()
     
     # Create ordered data for the funnel
     ordered_values = []
@@ -339,12 +325,48 @@ if current_page == "Dashboard":
         # Quick Statistics in cards
         st.subheader("📊 Overview")
         
-        # Funnel Chart in a nice container
-        st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
-        funnel_fig = create_funnel_chart(df)
-        if funnel_fig:
-            st.plotly_chart(funnel_fig, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Create two columns for charts
+        chart_col1, chart_col2 = st.columns(2)
+        
+        with chart_col1:
+            # Funnel Chart in a nice container
+            st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
+            funnel_fig = create_funnel_chart(df)
+            if funnel_fig:
+                st.plotly_chart(funnel_fig, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        with chart_col2:
+            # Add Pie Chart for Active Status
+            st.subheader("📈 Active Status Distribution")
+            st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
+            
+            # Calculate active vs inactive counts
+            status_counts = df['Active'].value_counts()
+            active_count = len(df[df['Active'] == 'Yes'])
+            inactive_count = len(df[df['Active'] != 'Yes'])
+            
+            # Create pie chart
+            pie_data = [
+                dict(
+                    type='pie',
+                    labels=['Active', 'Inactive'],
+                    values=[active_count, inactive_count],
+                    hole=0.4,
+                    marker=dict(colors=['#2ecc71', '#e74c3c'])
+                )
+            ]
+            
+            pie_layout = dict(
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                height=400,
+                margin=dict(t=0, b=0, l=0, r=0)
+            )
+            
+            pie_fig = dict(data=pie_data, layout=pie_layout)
+            st.plotly_chart(pie_fig, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
         
@@ -362,7 +384,7 @@ if current_page == "Dashboard":
                     <h3 style='color: #FF4B4B;'>Status Types</h3>
                     <h2>{}</h2>
                 </div>
-            """.format(df['Status of Claim'].nunique()), unsafe_allow_html=True)
+            """.format(df['Claim'].nunique()), unsafe_allow_html=True)
             
         with col3:
             st.markdown("""
@@ -370,7 +392,7 @@ if current_page == "Dashboard":
                     <h3 style='color: #FF4B4B;'>Active Phone Numbers</h3>
                     <h2>{}</h2>
                 </div>
-            """.format(df['Contact 1 phone'].notna().sum()), unsafe_allow_html=True)
+            """.format(df['Phone'].notna().sum()), unsafe_allow_html=True)
         
         
 elif current_page == "New Call":
@@ -786,7 +808,7 @@ else:  # Batch Calls tab
                         "request_data": {
                             "customer name": row['Contact 1 name'],
                             "home address": row['Address'],
-                            "status": row['Status of Claim'],
+                            "status": row['Claim'],
                             "last contact": row['Last contact date'],
                             "notes": row['Notes']
                         },
