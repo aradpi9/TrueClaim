@@ -382,7 +382,7 @@ elif current_page == "New Call":
     with col1:
         st.markdown("<div class='input-container'>", unsafe_allow_html=True)
         Customer_phone_number = st.text_input("📱 Phone Number", placeholder="+1234567890")
-        customer_name = st.text_input("👤 Customer Name")
+        Customer_name = st.text_input("👤 Customer Name")
         st.markdown("</div>", unsafe_allow_html=True)
         
     with col2:
@@ -400,9 +400,9 @@ elif current_page == "New Call":
         specialist_name = st.text_input("👨‍⚕️ Specialist Name")
         first_call_summary = st.text_area("📝 First Call Summary", height=100)
     
+    Agent_voice = "Public - June 2978" if "Cold caller" in Agent_task else "mason (da9f34)" if "Closer representative" in Agent_task else None
     Agent_task = "6a5a0412-6481-4533-b560-cf72283e956b" if "Cold caller" in Agent_task else "29e7ef67-4d36-4d15-aa09-0a38642fea26" if "Closer representative" in Agent_task else None
-    Aigen_voice = "Public - June 2978" if "Cold caller" in Agent_task else "mason (da9f34)" if "Closer representative" in Agent_task else None
-    
+
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         if st.button("📞 Make Call"):
@@ -423,9 +423,10 @@ elif current_page == "New Call":
                 data = {
                     "phone_number": Customer_phone_number,
                     "task": "",
+                    "from": "+13363603640",
                     "model": "enhanced",
                     "language": "en",
-                    "voice": Aigen_voice,
+                    "voice": Agent_voice,
                     "voice_settings": {},
                     "pathway_id": Agent_task,
                     "local_dialing": False,
@@ -442,14 +443,11 @@ elif current_page == "New Call":
                     "transfer_list": {},
                     "pronunciation_guide": [],
                     "request_data": {
-                    "customer name": customer_name,
+                    "customer name": Customer_name,
                     "home address": Home_address,
-                    "agent name": Agent_name
-                    },
-                    "retry": {
-                    "wait": 720,
-                    "voicemail_action": "hangup",
-                    "voicemail_message": ""
+                    "agent name": Agent_name,
+                    "specialist name": specialist_name,
+                    "first call summary": first_call_summary
                     },
                     "dynamic_data": [],
                     "analysis_schema": {},
