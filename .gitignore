@@ -1,0 +1,4 @@
+# Ignore logs
+*.log
+Dev_tests/logs/
+!logs/.gitkeep
