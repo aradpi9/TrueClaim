@@ -577,9 +577,12 @@ elif current_page == "Update Database":
         def combine_values(row, columns):
             values = []
             for col in columns:
-                if col in row and not pd.isna(row[col]) and row[col] != '' and row[col] is not None:
+                if col in row:
                     value = str(row[col]).strip()
                     if value.lower() != 'nan':  # Skip "nan" values
+                        # Remove .0 suffix if present for phone numbers
+                        if value.endswith('.0'):
+                            value = value[:-2]
                         values.append(value)
             return ', '.join(values) if values else None
         
@@ -591,7 +594,7 @@ elif current_page == "Update Database":
                 # Prepare phone numbers and emails
                 phones = combine_values(row, ['Phone 1', 'Phone 2', 'Phone 3', 'Phone 4', 'Phone 5'])
                 emails = combine_values(row, ['Email 1', 'Email 2', 'Email 3', 'Email 4', 'Email 5'])
-                
+                print(phones, emails)
                 # Process relatives data
                 relative_names = combine_values(row, ['RELATIVE 1: Name', 'RELATIVE 2: Name', 'RELATIVE 3: Name'])
                 relative_phones = combine_values(row, ['RELATIVE 1: Phone', 'RELATIVE 2: Phone', 'RELATIVE 3: Phone'])
