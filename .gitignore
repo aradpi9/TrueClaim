@@ -2,3 +2,4 @@
 *.log
 Dev_tests/logs/
 !logs/.gitkeep
+/Lead list

@@ -6,6 +6,9 @@ import pandas as pd
 from notion_client import Client
 import plotly.graph_objects as go
 from datetime import datetime
+import subprocess
+import sys
+
 
 
 # Set page configuration
@@ -175,6 +178,8 @@ def fetch_notion_data():
                 # Only add row if it has at least some data
                 if any(row.values()):
                     data.append(row)
+                
+                
             except:
                 continue
             
@@ -182,6 +187,9 @@ def fetch_notion_data():
         if df.empty:
             st.warning("No data found in the Notion database")
             return None
+        
+        df['Next Follow Up Date'] = pd.to_datetime(df['Next Follow Up Date'], utc=True).dt.tz_convert('America/New_York') + pd.Timedelta(hours = 5)
+
             
         return df
         
@@ -258,7 +266,8 @@ nav_items = {
     "🏠 Dashboard": "Dashboard",
     "📞 New Call": "New Call",
     "📊 Batch Calls": "Batch Calls",
-    "📥 Update Database": "Update Database"
+    "📥 Update Database": "Update Database",
+    "Server run" : "Server run"
 }
 
 selected_tab = st.sidebar.radio(
@@ -282,7 +291,7 @@ st.sidebar.markdown("""
     <div style='background-color: white; padding: 1rem; border-radius: 5px; margin: 0.5rem 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1);'>
         <div style='color: #666; font-size: 0.9em;'>
             <div style='margin-bottom: 0.8rem; display: flex; justify-content: space-between; align-items: center;'>
-                <span>API Status</span>
+                <span>Server Status</span>
                 <span style='color: #00C853;'>●</span>
             </div>
             <div style='margin-bottom: 0.8rem; display: flex; justify-content: space-between; align-items: center;'>
@@ -409,7 +418,7 @@ elif current_page == "New Call":
         
     with col2:
         st.markdown("<div class='input-container'>", unsafe_allow_html=True)
-        Agent_name = st.text_input("📱 Agent Name", placeholder="John Doe")
+        Agent_name = st.text_input("📱 Agent Name", placeholder="Christin")
         Home_address = st.text_input("🏠 Address")
         st.markdown("</div>", unsafe_allow_html=True)
     
@@ -750,7 +759,7 @@ elif current_page == "Update Database":
             st.error(f"Error reading file: {str(e)}")
             st.info("Please make sure your file is properly formatted and try again.")
 
-else:  # Batch Calls tab
+elif current_page == "Batch Calls":  # Batch Calls tab
     st.title("Batch Calls from Database")
     
     # Fetch and display data
@@ -839,3 +848,65 @@ else:  # Batch Calls tab
                         st.error(f"Error in call for {row['Contact 1 name']}: {str(e)}")
                     
                 st.success("Batch calls completed!")
+
+elif current_page == "Server run":
+    st.title("Server Run")
+    
+    # Fetch and display data
+    df = fetch_notion_data()
+    cold_call_df = df[((df['Lead'] == 'New') 
+        & (df['Active'] == 'Yes')) 
+        | ((df['Lead'] == 'Did not answered') 
+        & (df['Next Follow Up Date'] < pd.Timestamp.now(tz='America/New_York')) 
+        & (df['Active'] == 'Yes'))]   
+    
+    closer_call_df = df[(df['Lead'] == 'Interested') 
+        & (df['Active'] == 'Yes') 
+        & (df['Next Follow Up Date'] < pd.Timestamp.now(tz='America/New_York'))]
+    
+    if cold_call_df is not None:
+        st.markdown("""
+            <div style='background-color: #f0f2f6; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; text-align: center;'>
+                <h3 style='color: #4CAF50;'>Cold call ready list </h3>
+                <p>Table below represent the current leads which are applicalble for cold call</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Display the dataframe with better styling
+        cold_call_df_styled_df = (
+            cold_call_df.style
+            .set_properties(**{'background-color': '#f9f9f9', 'color': '#31333F'})
+            .apply(lambda x: ['background-color: #ffeded' if pd.isna(v) else '' for v in x])
+        )
+        
+        st.dataframe(cold_call_df_styled_df)
+
+                # Add a button to start batch calls
+        if st.button("Start cold call server"):           
+            result = subprocess.run([sys.executable, "Cold_call_Server_run.py"], capture_output=True, text=True)
+            st.write(result.stdout)
+            
+
+
+            
+    if closer_call_df is not None:
+        st.markdown("""
+            <div style='background-color: #f0f2f6; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; text-align: center;'>
+                <h3 style='color: #4CAF50;'>Closer call ready list </h3>
+                <p>Table below represent the current leads which are applicalble for closer call</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Display the dataframe with better styling
+        closer_call_df_styled_df = (
+            closer_call_df.style
+            .set_properties(**{'background-color': '#f9f9f9', 'color': '#31333F'})
+            .apply(lambda x: ['background-color: #ffeded' if pd.isna(v) else '' for v in x])
+        )
+        
+        st.dataframe(closer_call_df_styled_df)
+
+        # Add a button to start batch calls
+        if st.button("Start closer call server"):           
+            pass
+            
