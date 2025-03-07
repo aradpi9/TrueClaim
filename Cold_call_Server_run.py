@@ -5,7 +5,6 @@
 # - [ ] add "did not answer" counter, and set cold caller df pulling logic accordingly.
 # - [ ] add SMS communication in addtion to Mail.
 # - [ ] add "call hang out for some reason" logic.
-# - [ ] reduce response time, and play with noise canccelection which makes the aignet not hear the client
 # 
 
 # %% [markdown]
@@ -67,11 +66,11 @@ CLOSER_CALL_SCRIPT = "29e7ef67-4d36-4d15-aa09-0a38642fea26"
 
 
 # call general information
-System_phone_number = "+16268417929"
-Interruption_Threshold_in_ms = 100
-LLM_temperature = 1
+System_phone_number = "+14702354347"
+Interruption_Threshold_in_ms = 50
+LLM_temperature = 0.9
 Agent_name = "Christin"
-Cold_Agent_voice = "Public - June 2978"
+Cold_Agent_voice = "June"
 Specialist_name = "David"
 Closer_Agent_voice = "mason (da9f34)"
 
@@ -656,7 +655,7 @@ def call_setup(row, Customer_phone_number, type=""):
             "phone_number": Customer_phone_number,
             "from": System_phone_number,
             "task": "",
-            "model": "base",
+            "model": "turbo",
             "language": "en-US",
             "voice": Cold_Agent_voice,
             "voice_settings": {},
@@ -665,8 +664,9 @@ def call_setup(row, Customer_phone_number, type=""):
             "max_duration": "12",
             "answered_by_enabled": False,
             "wait_for_greeting": True,
-            "noise_cancellation": True,
+            "noise_cancellation": False,
             "ignore_button_press": True,
+            "block_interruptions": True,
             "record": False,
             "amd": False,
             "voicemail_action": "leave_message",
@@ -703,7 +703,7 @@ def call_setup(row, Customer_phone_number, type=""):
             "max_duration": "12",
             "answered_by_enabled": False,
             "wait_for_greeting": True,
-            "noise_cancellation": True,
+            "noise_cancellation": False,
             "ignore_button_press": True,
             "record": False,
             "amd": False,
@@ -824,43 +824,3 @@ for ids in cold_call_ids.keys():
     print(f"Sending communcation to notion row: {notion_row_id}")
     logger.info(f"Update databsae for row: {notion_row_id} according to call: {call_id}")     
     
-    
-    
-
-# %% [markdown]
-# closer main loop
-
-# %%
-
-
-Closer_call_df = pull_notion_data("closer")
-
-# iterate rows and collect user data
-for index, row in Closer_call_df.iterrows():
-
-    #call setup
-    data, headers = call_setup(row, type="closer")
-    # send call
-    send_call_response = json.loads(requests.request("POST", Blend_url, json=data, headers=headers).text)
-
-    # print status
-    print(send_call_response)
-    
-    # collect call id
-    call_id = send_call_response["call_id"]
-    
-    call_id_response = json.loads(requests.request("GET", Blend_url+"/"+call_id, headers=headers).text)
-    # wait for call to end
-    while call_id_response["completed"] == False:
-        time.sleep(3)
-        print("Call is still active")
-        call_id_response = json.loads(requests.request("GET", Blend_url+"/"+call_id, headers=headers).text)
-        
-    # wait for tags to update
-    time.sleep(3)
-    
-    # update database based on results
-    update_data_base_after_closer(row['notion raw id'],call_id)
-
-    # send correct mail
-    post_closer_call_communication(row['notion raw id'])
