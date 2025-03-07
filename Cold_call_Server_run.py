@@ -67,7 +67,7 @@ CLOSER_CALL_SCRIPT = "29e7ef67-4d36-4d15-aa09-0a38642fea26"
 
 
 # call general information
-System_phone_number = "+14702354347"
+System_phone_number = "+16268417929"
 Interruption_Threshold_in_ms = 100
 LLM_temperature = 1
 Agent_name = "Christin"
