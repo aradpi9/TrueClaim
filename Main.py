@@ -132,10 +132,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Notion client
-NOTION_TOKEN = "ntn_S6159294934albrajfceBHL4szrrrMllKAcFNUGM62v7JI"
+# Constants for database IDs
 DATABASE_ID = "18316f1f61d680a2921bd08b8c62f895"
+SECOND_DATABASE_ID = "1c216f1f61d680c28534e5466d8f98d4"
+NOTION_TOKEN = "ntn_S6159294934albrajfceBHL4szrrrMllKAcFNUGM62v7JI"
 
+# Initialize Notion client
 def fetch_notion_data():
     """Fetch data from Notion database"""
     if not NOTION_TOKEN:
@@ -513,6 +515,8 @@ elif current_page == "Update Database":
     # Initialize session state for storing page IDs if not exists
     if 'last_uploaded_pages' not in st.session_state:
         st.session_state.last_uploaded_pages = []
+    if 'last_uploaded_second_pages' not in st.session_state:
+        st.session_state.last_uploaded_second_pages = []
     
     def update_notion_database(df):
         notion = Client(auth=NOTION_TOKEN)
@@ -640,7 +644,29 @@ elif current_page == "Update Database":
                     }
                 }
                 
-                # Remove any properties with empty values
+                # Create the second page for the second database with the requested mapping
+                current_time = datetime.now().isoformat()
+                second_page = {
+                    "parent": {"database_id": SECOND_DATABASE_ID},
+                    "properties": {
+                        "Date sold": create_date(row.get('Date Sold')),
+                        "First name": create_title(row.get('First Name')),
+                        "Last name": create_rich_text(row.get('Last Name')),
+                        "Main contact phone": create_phone(phones),
+                        "Main contact Email": create_email(emails),
+                        "Property Street": create_rich_text(row.get('Property Street')),
+                        "Property City": create_rich_text(row.get('Property City')),
+                        "Property State": create_rich_text(row.get('Property State')),
+                        "Property ZIP Code": create_number(row.get('Property ZIP Code')),
+                        "County": create_rich_text(row.get('County')),
+                        "Active": {"select": {"name": "No"}},
+                        "Campaign start date": {"date": {"start": current_time}},
+                        "Campaign state": {"select": {"name": "1"}},
+                        "Answered?": {"select": {"name": "No"}}
+                    }
+                }
+                
+                # Remove any properties with empty values for first database
                 properties_to_remove = []
                 for prop_name, prop_value in new_page["properties"].items():
                     if (prop_value.get("rich_text", []) == [] and "rich_text" in prop_value) or \
@@ -654,11 +680,28 @@ elif current_page == "Update Database":
                 for prop_name in properties_to_remove:
                     del new_page["properties"][prop_name]
                 
+                # Remove any properties with empty values for second database
+                properties_to_remove = []
+                for prop_name, prop_value in second_page["properties"].items():
+                    if (prop_value.get("rich_text", []) == [] and "rich_text" in prop_value) or \
+                       (prop_value.get("number") is None and "number" in prop_value) or \
+                       (prop_value.get("phone_number") is None and "phone_number" in prop_value) or \
+                       (prop_value.get("email") is None and "email" in prop_value) or \
+                       (prop_value.get("date") is None and "date" in prop_value) or \
+                       (prop_value.get("title", []) == [] and "title" in prop_value):
+                        properties_to_remove.append(prop_name)
+                
+                for prop_name in properties_to_remove:
+                    del second_page["properties"][prop_name]
+                
                 try:
-                    # Create the page in Notion
-                    response = notion.pages.create(**new_page)
+                    # Create the page in both Notion databases
+                    first_response = notion.pages.create(**new_page)
+                    second_response = notion.pages.create(**second_page)
+                    
                     success_count += 1
-                    st.session_state.last_uploaded_pages.append(response['id'])  # Store the page ID
+                    st.session_state.last_uploaded_pages.append(first_response['id'])  # Store the first page ID
+                    st.session_state.last_uploaded_second_pages.append(second_response['id'])  # Store the second page ID
                 except Exception as e:
                     error_count += 1
                     st.error(f"Error creating page: {str(e)}")
@@ -735,25 +778,35 @@ elif current_page == "Update Database":
                         active_progress = st.progress(0)
                         total_pages = len(st.session_state.last_uploaded_pages)
                         
-                        for i, page_id in enumerate(st.session_state.last_uploaded_pages):
+                        for i, (page_id, second_page_id) in enumerate(zip(st.session_state.last_uploaded_pages, st.session_state.last_uploaded_second_pages)):
                             try:
-                                # Update the page's Active property to "Yes"
+                                # Update the page's Active property to "Yes" in first database
                                 notion.pages.update(
                                     page_id=page_id,
                                     properties={
                                         "Active": {"select": {"name": "Yes"}}
                                     }
                                 )
+                                
+                                # Update the page's Active property to "Yes" in second database
+                                notion.pages.update(
+                                    page_id=second_page_id,
+                                    properties={
+                                        "Active": {"select": {"name": "Yes"}}
+                                    }
+                                )
+                                
                                 active_success += 1
                             except Exception as e:
                                 active_error += 1
-                                st.error(f"Error updating page {page_id}: {str(e)}")
+                                st.error(f"Error updating page {page_id} or {second_page_id}: {str(e)}")
                             
                             active_progress.progress((i + 1) / total_pages)
                         
                         if active_success > 0:
-                            st.success(f"Successfully set {active_success} records as Active. {active_error} updates failed.")
-                            st.session_state.last_uploaded_pages = []  # Clear the list after activation
+                            st.success(f"Successfully set {active_success} records as Active in both databases. {active_error} updates failed.")
+                            st.session_state.last_uploaded_pages = []  # Clear the lists after activation
+                            st.session_state.last_uploaded_second_pages = []
         
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
@@ -909,4 +962,3 @@ elif current_page == "Server run":
         # Add a button to start batch calls
         if st.button("Start closer call server"):           
             pass
-            
