@@ -134,7 +134,7 @@ st.markdown("""
 
 # Constants for database IDs
 DATABASE_ID = "18316f1f61d680a2921bd08b8c62f895"
-SECOND_DATABASE_ID = "1c216f1f61d680c28534e5466d8f98d4"
+MARKETING_DATABASE_ID = "1c216f1f61d680c28534e5466d8f98d4"
 NOTION_TOKEN = "ntn_S6159294934albrajfceBHL4szrrrMllKAcFNUGM62v7JI"
 
 # Initialize Notion client
@@ -647,7 +647,7 @@ elif current_page == "Update Database":
                 # Create the second page for the second database with the requested mapping
                 current_time = datetime.now().isoformat()
                 second_page = {
-                    "parent": {"database_id": SECOND_DATABASE_ID},
+                    "parent": {"database_id": MARKETING_DATABASE_ID},
                     "properties": {
                         "Date sold": create_date(row.get('Date Sold')),
                         "First name": create_title(row.get('First Name')),
